@@ -225,11 +225,20 @@ export class VueAdapter extends BaseAdapter {
     await this.sleep(config.actionDelay * 4);
 
     // Step 2: 检查是否弹出了 s-dialog 级联选择器
-    const dialog = document.querySelector('.s-dialog:not([style*="display: none"])');
+    // 遍历所有 s-dialog，找到可见的那个（没有 display:none 的）
+    const allDialogs = document.querySelectorAll('.s-dialog');
+    let dialog: HTMLElement | null = null;
+    for (const d of allDialogs) {
+      const el = d as HTMLElement;
+      if (el.offsetWidth > 0 || el.offsetHeight > 0 || getComputedStyle(el).display !== 'none') {
+        dialog = el;
+        break;
+      }
+    }
 
     if (dialog) {
       console.log('[AutoFormFiller] 检测到级联选择对话框');
-      return await this.fillCascaderDialog(dialog as HTMLElement, targetValue, field, config, startTime);
+      return await this.fillCascaderDialog(dialog, targetValue, field, config, startTime);
     }
 
     // Step 3: 没有对话框，尝试普通下拉
@@ -342,9 +351,9 @@ export class VueAdapter extends BaseAdapter {
       }
     }
 
-    // 关闭对话框 — 点击关闭按钮
+    // 关闭对话框 — 在可见 dialog 内查找关闭按钮
     await this.sleep(config.actionDelay);
-    const closeBtn = dialog.querySelector('.s-dialog__icon, .s-icon-guanbi, .s-dialog__close, [class*="close"]');
+    const closeBtn = dialog.querySelector('.s-dialog__icon, .s-icon-guanbi, .s-dialog__close, .s-dialog__header [class*="close"], .s-dialog__header i');
     if (closeBtn) {
       console.log('[AutoFormFiller] 关闭级联对话框');
       this.clickElement(closeBtn as HTMLElement);
@@ -352,7 +361,7 @@ export class VueAdapter extends BaseAdapter {
       // 点击遮罩关闭
       const overlay = dialog.parentElement;
       if (overlay) {
-        overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        this.clickElement(overlay);
       }
     }
     await this.sleep(config.actionDelay);
