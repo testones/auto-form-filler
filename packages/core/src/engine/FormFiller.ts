@@ -117,11 +117,29 @@ export class FormFiller {
       }
       Logger.info(`Adapter selected: ${adapter.capability.name}`);
 
-      // Step 3: 检测表单字段
-      Logger.info('Step 3: Detecting form fields...');
-      const formContainer = siteConfig.getFormContainer?.() ?? document.body;
+      // Step 3: 预处理（先点击编辑按钮等，再检测字段）
+      Logger.info('Step 3: Pre-fill processing...');
+      await siteConfig.beforeFill?.();
+      await adapter.beforeFill?.({
+        resumeData,
+        config: this.config,
+        platform: this.platform,
+      });
+
+      // Step 4: 检测表单字段
+      Logger.info('Step 4: Detecting form fields...');
+      let formContainer = siteConfig.getFormContainer?.() ?? document.body;
       Logger.info(`Form container:`, formContainer.tagName, formContainer.className);
-      const detectedFields = this.fieldDetector.detectInContainer(formContainer);
+
+      let detectedFields = this.fieldDetector.detectInContainer(formContainer);
+
+      // 如果容器内没找到字段，回退到 document.body 扫描全页
+      if (detectedFields.length === 0) {
+        Logger.warn(`容器内未检测到字段，回退到全页扫描...`);
+        formContainer = document.body;
+        detectedFields = this.fieldDetector.detectInContainer(formContainer);
+      }
+
       Logger.info(`Detected ${detectedFields.length} fields`);
 
       // 调试：打印所有检测到的字段
@@ -131,8 +149,8 @@ export class FormFiller {
         );
       });
 
-      // Step 4: 匹配字段到简历数据
-      Logger.info('Step 4: Matching fields...');
+      // Step 5: 匹配字段到简历数据
+      Logger.info('Step 5: Matching fields...');
       const matchedFields = this.fieldMatcher.match(detectedFields);
       Logger.info(`Matched ${matchedFields.length} fields to resume data`);
 
@@ -143,17 +161,8 @@ export class FormFiller {
         );
       });
 
-      // Step 5: 应用站点自定义映射
+      // Step 6: 应用站点自定义映射
       const finalMappings = siteConfig.applyFieldMappings?.(matchedFields) ?? matchedFields;
-
-      // Step 6: 预处理
-      Logger.info('Step 6: Pre-fill processing...');
-      await siteConfig.beforeFill?.();
-      await adapter.beforeFill?.({
-        resumeData,
-        config: this.config,
-        platform: this.platform,
-      });
 
       // Step 7: 逐字段填充
       Logger.info('Step 7: Filling fields...');

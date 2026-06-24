@@ -215,11 +215,14 @@ export class ZhilianConfig extends BaseSiteConfig {
 
   getFormContainer(): HTMLElement | null {
     // 智联简历页的表单容器
+    // 注意：不能用 [class*="resume"]，会匹配到 resume-tabs-wrapper 等非表单区域
     return (
       document.querySelector('.resume-form') ||
       document.querySelector('.resume-edit') ||
       document.querySelector('.resume-content') ||
-      document.querySelector('[class*="resume"]') ||
+      document.querySelector('.resume__edit') ||
+      document.querySelector('[class*="resume-edit"]') ||
+      document.querySelector('[class*="resumeEditor"]') ||
       document.querySelector('.el-form') ||
       document.querySelector('#app') ||
       document.body
@@ -227,13 +230,60 @@ export class ZhilianConfig extends BaseSiteConfig {
   }
 
   /**
-   * 智联的 SPA 路由切换后需要等待表单渲染
+   * 智联简历页默认是展示状态，需要点击"编辑"按钮才会出现表单
+   * beforeFill 会尝试找到并点击编辑按钮
    */
   async beforeFill(): Promise<void> {
-    // 等待表单元素出现
-    await this.waitForElement('.el-form, .el-input, input, textarea, select', 8000);
+    // 等待页面完全加载
+    await this.sleep(1000);
 
-    // 额外等待 Vue 渲染完成
-    await this.sleep(500);
+    // 尝试找到并点击"编辑"按钮
+    const editSelectors = [
+      'button:has(.el-icon-edit)',
+      '.el-button:has(.el-icon-edit)',
+      '[class*="edit"]:has(.el-icon-edit)',
+      'a:has(.el-icon-edit)',
+      'span:has(.el-icon-edit)',
+      // 智联可能用文字按钮
+      '.el-button--text',
+      '[class*="edit-btn"]',
+      '[class*="editor-btn"]',
+    ];
+
+    let clicked = false;
+    for (const selector of editSelectors) {
+      const editBtns = document.querySelectorAll(selector);
+      for (const btn of editBtns) {
+        const text = (btn as HTMLElement).textContent || '';
+        if (text.includes('编辑') || text.includes('修改') || (btn as HTMLElement).querySelector('.el-icon-edit')) {
+          console.log('[AutoFormFiller] 点击编辑按钮:', text.trim());
+          (btn as HTMLElement).click();
+          clicked = true;
+          break;
+        }
+      }
+      if (clicked) break;
+    }
+
+    // 如果没找到带文字的编辑按钮，找所有 .el-icon-edit 元素
+    if (!clicked) {
+      const editIcons = document.querySelectorAll('.el-icon-edit');
+      if (editIcons.length > 0) {
+        console.log('[AutoFormFiller] 点击编辑图标');
+        (editIcons[0] as HTMLElement).click();
+        clicked = true;
+      }
+    }
+
+    if (clicked) {
+      // 等待表单渲染
+      console.log('[AutoFormFiller] 等待表单渲染...');
+      await this.waitForElement('.el-form, .el-input, input, textarea, select', 8000);
+      await this.sleep(500);
+    } else {
+      // 没找到编辑按钮，可能已经在编辑模式，直接等表单
+      console.log('[AutoFormFiller] 未找到编辑按钮，尝试直接检测表单');
+      await this.waitForElement('.el-form, .el-input, input, textarea, select', 3000);
+    }
   }
 }
