@@ -32,6 +32,7 @@ export const SITE_URL_RULES: SiteUrlRule[] = [
     domain: 'zhaopin.com',
     patterns: [
       /^https:\/\/i\.zhaopin\.com\/resume/,
+      /^https:\/\/i\.zhaopin\.com\/.*resume/,
       /^https:\/\/rd5\.zhaopin\.com\/resume/,
       /^https:\/\/www\.zhaopin\.com\/resume/,
     ],

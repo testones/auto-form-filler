@@ -3,8 +3,7 @@
  * Content Script
  *
  * 运行在招聘网站页面的隔离世界中。
- * 注意：不能用 ES module import/export，因为 Chrome MV3 content script 不支持 ESM
- * Vite 构建时会以 IIFE 格式打包
+ * 支持 iframe（all_frames: true），每个 frame 都会注入。
  */
 
 // 注入脚本到页面主世界
@@ -16,28 +15,58 @@ function injectScript(): void {
   const script = document.createElement('script');
   script.src = chrome.runtime.getURL('injected.js');
   script.onload = () => {
-    console.log('[AutoFormFiller] 注入脚本已加载');
+    console.log('[AutoFormFiller] 注入脚本已加载', location.href);
     window.postMessage({ source: 'auto-form-filler-content', type: 'SCRIPT_READY' }, '*');
   };
   script.onerror = () => {
-    console.error('[AutoFormFiller] 注入脚本加载失败');
+    console.error('[AutoFormFiller] 注入脚本加载失败', location.href);
   };
   (document.head || document.documentElement).appendChild(script);
 }
 
-// 页面加载完成后注入
-if (document.readyState === 'complete' || document.readyState === 'idle') {
-  injectScript();
-} else {
-  window.addEventListener('DOMContentLoaded', injectScript);
+// 延迟注入，确保 DOM 就绪
+function tryInject() {
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    injectScript();
+  } else {
+    window.addEventListener('DOMContentLoaded', injectScript, { once: true });
+  }
 }
 
-// 标记 content script 已就绪
-const contentReady = true;
+// 智联等 SPA 站点可能动态切换路由，需要持续监听
+let injectTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleReinject() {
+  if (injectTimer) clearTimeout(injectTimer);
+  injectTimer = setTimeout(() => {
+    if (!(window as any).__autoFormFillerInjected) {
+      injectScript();
+    }
+  }, 2000);
+}
+
+tryInject();
+
+// 监听 URL 变化（SPA 路由切换）
+let lastUrl = location.href;
+const urlObserver = new MutationObserver(() => {
+  if (location.href !== lastUrl) {
+    lastUrl = location.href;
+    console.log('[AutoFormFiller] URL 变化:', lastUrl);
+    // 重置注入状态，重新注入
+    (window as any).__autoFormFillerInjected = false;
+    tryInject();
+  }
+});
+urlObserver.observe(document.documentElement, { childList: true, subtree: true });
 
 // 监听来自 background/popup 的消息
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'FILL_FORM') {
+    // 检查注入脚本是否就绪
+    if (!(window as any).__autoFormFillerInjected) {
+      injectScript();
+    }
+
     // 转发给注入脚本
     window.postMessage(
       { source: 'auto-form-filler-content', type: 'FILL_FORM', resumeData: message.payload },
@@ -59,7 +88,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     setTimeout(() => {
       if (!responded) {
         window.removeEventListener('message', handler);
-        sendResponse({ success: false, error: '填充超时 - 注入脚本可能未正确加载' });
+        // 检查是否有表单元素（即使注入脚本没就绪）
+        const hasForm = document.querySelector('input, textarea, select, .el-input, .el-select, .ant-input, .ant-select');
+        sendResponse({
+          success: false,
+          error: hasForm
+            ? '注入脚本未响应，可能页面框架拦截了消息。请刷新页面后重试。'
+            : '当前页面未检测到表单元素，请确保在简历编辑页面。',
+        });
       }
     }, 30000);
 
@@ -93,15 +129,14 @@ function detectFramework(): { framework: string; uiLibrary: string; url: string 
   const url = window.location.href;
 
   // 检测 React
-  const rootEl = document.querySelector('#root');
   const hasReact = !!(
     document.querySelector('[data-reactroot]') ||
     document.querySelector('[data-reactid]') ||
-    rootEl?.children.length > 0
+    document.querySelector('#root')?.children.length
   );
 
   // 检测 Vue
-  const appEl = document.querySelector('#app');
+  const appEl = document.querySelector('#app, [data-v-app]');
   const hasVue = !!(
     document.querySelector('[data-v-app]') ||
     (appEl as any)?.__vue_app__ ||
@@ -135,5 +170,4 @@ function detectFramework(): { framework: string; uiLibrary: string; url: string 
   return { framework, uiLibrary, url };
 }
 
-// 通知 background content script 已就绪
-console.log('[AutoFormFiller] content script 已加载');
+console.log('[AutoFormFiller] content script 已加载', location.href);
