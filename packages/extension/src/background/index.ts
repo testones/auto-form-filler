@@ -48,12 +48,21 @@ const DEFAULT_RESUME = {
   },
 };
 
-// 安装时初始化默认简历数据
+// 安装/更新时初始化默认简历数据
 chrome.runtime.onInstalled.addListener(async () => {
   const stored = await chrome.storage.local.get(STORAGE_KEY);
-  if (!stored[STORAGE_KEY]) {
+  const data = stored[STORAGE_KEY];
+
+  // 如果没有数据，或者缺少新增字段，用默认数据覆盖
+  const needsUpdate = !data ||
+    !data.basicInfo?.politicalStatus ||
+    !data.basicInfo?.hometown ||
+    !data.jobPreference?.jobStatus ||
+    !data.jobPreference?.industry;
+
+  if (needsUpdate) {
     await chrome.storage.local.set({ [STORAGE_KEY]: DEFAULT_RESUME });
-    console.log('[AutoFormFiller] 默认简历数据已初始化');
+    console.log('[AutoFormFiller] 简历数据已更新为最新默认值');
   }
 });
 

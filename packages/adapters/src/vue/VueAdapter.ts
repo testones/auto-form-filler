@@ -203,8 +203,10 @@ export class VueAdapter extends BaseAdapter {
   }
 
   /** 智联 select-input 填充
-   * 智联的城市选择器会弹出 s-dialog + s-cascader 级联对话框
-   * 结构：省份(s-cascader__first-level) → 城市(s-cascader__second-level) → 区县(s-cascader__third-level)
+   * 智联有三种 select-input：
+   * 1. 城市选择器 → 弹出 s-dialog + s-cascader 级联对话框
+   * 2. 职位/行业搜索选择器 → 弹出搜索面板，输入文字后从结果中选择
+   * 3. 普通下拉
    */
   private async fillSelectInput(context: FillContext): Promise<FillResult> {
     const { field, value, config } = context;
@@ -213,52 +215,107 @@ export class VueAdapter extends BaseAdapter {
 
     const selectEl = field.element.closest('.select-input') || field.element;
     this.scrollIntoView(selectEl as HTMLElement);
-    console.log(`[AutoFormFiller] fillSelectInput: 查找 "${targetValue}"`);
+    console.log(`[AutoFormFiller] fillSelectInput: 查找 "${targetValue}" (label: ${field.label})`);
 
     // Step 1: 点击打开
     const el = selectEl as HTMLElement;
-    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    await this.sleep(50);
-    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-    await this.sleep(50);
-    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    this.clickElement(el);
     await this.sleep(config.actionDelay * 4);
 
-    // Step 2: 检查是否弹出了 s-dialog 级联选择器
-    // 遍历所有 s-dialog，找到可见的那个（没有 display:none 的）
+    // Step 2: 检查是否弹出了 s-dialog 级联选择器（城市选择器）
     const allDialogs = document.querySelectorAll('.s-dialog');
     let dialog: HTMLElement | null = null;
     for (const d of allDialogs) {
-      const el = d as HTMLElement;
-      if (el.offsetWidth > 0 || el.offsetHeight > 0 || getComputedStyle(el).display !== 'none') {
-        dialog = el;
+      const dEl = d as HTMLElement;
+      if (dEl.offsetWidth > 0 || dEl.offsetHeight > 0 || getComputedStyle(dEl).display !== 'none') {
+        dialog = dEl;
         break;
       }
     }
 
-    if (dialog) {
+    if (dialog && dialog.querySelector('.s-cascader')) {
       console.log('[AutoFormFiller] 检测到级联选择对话框');
       return await this.fillCascaderDialog(dialog, targetValue, field, config, startTime);
     }
 
-    // Step 3: 没有对话框，尝试普通下拉
-    const dropdownContainers = [
-      selectEl.parentElement?.querySelector('.s-region'),
-      selectEl.closest('.job-target-edit__item')?.querySelector('.s-region'),
-      document.querySelector('.s-region:not([style*="display: none"])'),
-    ].filter(Boolean);
+    // Step 3: 搜索型选择器 — 找到搜索框，输入文字，等待结果，点击匹配项
+    const searchInput = document.querySelector<HTMLInputElement>(
+      '.s-search-select .s-input__inner, .s-input__inner[placeholder*="搜索"]'
+    );
+
+    if (searchInput && searchInput.offsetParent !== null) {
+      console.log('[AutoFormFiller] 检测到搜索型选择器');
+      return await this.fillSearchSelect(searchInput, targetValue, field, config, startTime);
+    }
+
+    // Step 4: 普通下拉 — 查找下拉选项
+    const allOptions = document.querySelectorAll(
+      '.s-options .s-option, .s-select-dropdown__item, [class*="option"]:not([style*="display: none"])'
+    );
 
     let found = false;
+    for (const opt of allOptions) {
+      const text = opt.textContent?.trim() || '';
+      if (text === targetValue || text.includes(targetValue)) {
+        this.clickElement(opt as HTMLElement);
+        found = true;
+        console.log(`[AutoFormFiller]   选择: "${text}"`);
+        await this.sleep(config.actionDelay);
+        break;
+      }
+    }
 
-    for (const container of dropdownContainers) {
-      if (!container) continue;
-      const items = container.querySelectorAll('li, .city-item, [class*="region"] li, a, span');
-      for (const item of items) {
-        const text = item.textContent?.trim() || '';
+    if (!found) {
+      console.log(`[AutoFormFiller]   未找到匹配项: "${targetValue}"`);
+      document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    }
+
+    if (config.highlightFilled) this.highlight(selectEl as HTMLElement, config.highlightColor);
+    return this.successResult(field.label, Date.now() - startTime, FillStrategy.CLICK_SELECT);
+  }
+
+  /** 搜索型选择器填充（职位/行业等）
+   * 输入搜索文字 → 等待结果出现 → 点击匹配项
+   */
+  private async fillSearchSelect(
+    searchInput: HTMLInputElement,
+    targetValue: string,
+    field: FillContext['field'],
+    config: FillContext['config'],
+    startTime: number
+  ): Promise<FillResult> {
+    console.log(`[AutoFormFiller] 搜索选择器: 输入 "${targetValue}"`);
+
+    // Step 1: 聚焦并输入搜索文字
+    searchInput.focus();
+    searchInput.dispatchEvent(new FocusEvent('focus', { bubbles: true }));
+    await this.sleep(200);
+
+    // 使用原生 setter 设置值
+    const nativeSetter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    nativeSetter?.call(searchInput, targetValue);
+    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+    searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await this.sleep(800); // 等待搜索结果
+
+    // Step 2: 查找搜索结果选项
+    const optionSelectors = [
+      '.s-options .s-option:not([style*="display: none"])',
+      '.s-select-dropdown__item:not([style*="display: none"])',
+      '.s-search-select .s-option',
+      '[class*="search-result"] li',
+      '[class*="dropdown"] li:not([style*="display: none"])',
+    ];
+
+    let found = false;
+    for (const selector of optionSelectors) {
+      const options = document.querySelectorAll(selector);
+      for (const opt of options) {
+        const text = opt.textContent?.trim() || '';
         if (text === targetValue || text.includes(targetValue)) {
-          this.clickElement(item as HTMLElement);
+          console.log(`[AutoFormFiller]   搜索结果: 点击 "${text}"`);
+          this.clickElement(opt as HTMLElement);
           found = true;
-          console.log(`[AutoFormFiller]   选择: "${text}"`);
           await this.sleep(config.actionDelay);
           break;
         }
@@ -267,10 +324,13 @@ export class VueAdapter extends BaseAdapter {
     }
 
     if (!found) {
+      console.log(`[AutoFormFiller]   搜索无结果: "${targetValue}"`);
+      // 按 Escape 关闭
+      searchInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     }
 
-    if (config.highlightFilled) this.highlight(selectEl as HTMLElement, config.highlightColor);
+    if (config.highlightFilled) this.highlight(field.element, config.highlightColor);
     return this.successResult(field.label, Date.now() - startTime, FillStrategy.CLICK_SELECT);
   }
 
