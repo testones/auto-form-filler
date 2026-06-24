@@ -101,6 +101,27 @@ export class FieldClassifier {
       return FieldType.FILE_UPLOAD;
     }
 
+    // iView UI 组件（智联招聘使用）
+    if (allClasses.includes('ivu-select') || element.querySelector('.ivu-select')) {
+      return FieldType.SELECT;
+    }
+    if (allClasses.includes('ivu-date-picker') || element.closest('.ivu-date-picker')) {
+      return FieldType.DATE_PICKER;
+    }
+    if (allClasses.includes('ivu-checkbox') || element.querySelector('.ivu-checkbox')) {
+      return FieldType.CHECKBOX;
+    }
+    if (allClasses.includes('ivu-radio-group') || element.querySelector('.ivu-radio-group')) {
+      return FieldType.RADIO_GROUP;
+    }
+    // 智联自研组件
+    if (allClasses.includes('zp-radio') || element.querySelector('.zp-radio')) {
+      return FieldType.RADIO_GROUP;
+    }
+    if (allClasses.includes('select-input') || element.querySelector('.select-input')) {
+      return FieldType.SELECT;
+    }
+
     // 通用特征
     if (element.getAttribute('role') === 'combobox' || element.getAttribute('role') === 'listbox') {
       return FieldType.SELECT;
@@ -136,6 +157,12 @@ export class FieldClassifier {
     if (allClasses.includes('el-switch')) return 'el-switch';
     if (allClasses.includes('el-upload')) return 'el-upload';
     if (allClasses.includes('el-input')) return 'el-input';
+    if (allClasses.includes('ivu-input')) return 'ivu-input';
+    if (allClasses.includes('ivu-select')) return 'ivu-select';
+    if (allClasses.includes('ivu-date-picker')) return 'ivu-date-picker';
+    if (allClasses.includes('ivu-checkbox')) return 'ivu-checkbox';
+    if (allClasses.includes('zp-radio')) return 'zp-radio';
+    if (allClasses.includes('select-input')) return 'select-input';
 
     return 'native';
   }

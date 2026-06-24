@@ -56,6 +56,7 @@ export class DOMScanner {
     const fields: DetectedField[] = [];
     fields.push(...this.scanAntDesignComponents());
     fields.push(...this.scanElementUIComponents());
+    fields.push(...this.scanIViewComponents());
     fields.push(...this.scanGenericComponents());
     return fields;
   }
@@ -111,6 +112,72 @@ export class DOMScanner {
     }
 
     return fields;
+  }
+
+  /** 扫描 iView UI 组件（智联招聘） */
+  private scanIViewComponents(): DetectedField[] {
+    const fields: DetectedField[] = [];
+
+    // 1. 通过 profileLib__item 扫描（智联特有的表单项容器）
+    const profileItems = this.root.querySelectorAll('.profileLib__item, .profile-edit-item, .job-target-edit__item');
+    for (const item of profileItems) {
+      const field = this.processProfileItemContainer(item as HTMLElement);
+      if (field) fields.push(field);
+    }
+
+    // 2. 扫描独立的 ivu-input（不在表单项容器中的）
+    const ivuInputs = this.root.querySelectorAll('.ivu-input:not(.ivu-input[readonly])');
+    for (const el of ivuInputs) {
+      if (el.closest('.profileLib__item, .profile-edit-item, .ivu-form-item')) continue;
+      const field = this.createDetectedField(el as HTMLElement);
+      if (field) fields.push(field);
+    }
+
+    // 3. 扫描 ivu-date-picker（包括 readonly 的 input）
+    const ivuDatePickers = this.root.querySelectorAll('.ivu-date-picker');
+    for (const el of ivuDatePickers) {
+      if (el.closest('.profileLib__item, .profile-edit-item')) continue;
+      const input = el.querySelector('input');
+      if (input) {
+        const field = this.createDetectedField(input);
+        if (field) fields.push(field);
+      }
+    }
+
+    // 4. 扫描 ivu-select
+    const ivuSelects = this.root.querySelectorAll('.ivu-select');
+    for (const el of ivuSelects) {
+      if (el.closest('.profileLib__item, .profile-edit-item')) continue;
+      const field = this.createDetectedField(el as HTMLElement);
+      if (field) fields.push(field);
+    }
+
+    return fields;
+  }
+
+  /** 处理智联特有的表单项容器 .profileLib__item */
+  private processProfileItemContainer(container: HTMLElement): DetectedField | null {
+    const controlSelectors = [
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"])',
+      'textarea',
+      'select',
+      '.ivu-input',
+      '.ivu-select',
+      '.ivu-date-picker',
+      '.zp-radio',
+      '.select-input',
+      '[role="combobox"]',
+    ];
+
+    for (const sel of controlSelectors) {
+      const control = container.querySelector(sel);
+      if (control && !isElementDisabled(control as HTMLElement)) {
+        const field = this.createDetectedField(control as HTMLElement, container);
+        if (field) return field;
+      }
+    }
+
+    return null;
   }
 
   /** 扫描通用组件（role 属性等） */

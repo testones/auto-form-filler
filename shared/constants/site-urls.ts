@@ -37,7 +37,7 @@ export const SITE_URL_RULES: SiteUrlRule[] = [
       /^https:\/\/www\.zhaopin\.com\/resume/,
     ],
     framework: 'vue',
-    uiLibrary: 'element-ui',
+    uiLibrary: 'iview',
   },
   {
     name: '猎聘',

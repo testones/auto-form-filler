@@ -77,11 +77,11 @@ export function getLabelForElement(element: HTMLElement): string | null {
 
   // 方式4: 父级 form-item 中的 label
   const formItem = element.closest(
-    '.ant-form-item, .el-form-item, .arco-form-item, .form-item, .form-group'
+    '.ant-form-item, .el-form-item, .arco-form-item, .form-item, .form-group, .profileLib__item, .profile-edit-item, .ivu-form-item'
   );
   if (formItem) {
     const label = formItem.querySelector(
-      '.ant-form-item-label label, .el-form-item__label, .arco-form-item-label, label, .label'
+      '.ant-form-item-label label, .el-form-item__label, .arco-form-item-label, .profileLib__item-label, .profile-edit-item-label, .ivu-form-item-label, label, .label, .job-target-edit__lab'
     );
     if (label?.textContent) {
       return label.textContent.trim();
@@ -107,10 +107,14 @@ export function isElementVisible(element: HTMLElement): boolean {
 
 /**
  * 判断元素是否被禁用
+ * 注意：readonly 不等于 disabled！
+ * DatePicker 的 input 通常是 readonly（通过面板选值），但仍然可以填充
  */
 export function isElementDisabled(element: HTMLElement): boolean {
   if (element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement) {
-    return element.disabled || element.readOnly;
+    // 只检查 disabled，不检查 readOnly
+    // DatePicker 的 input 是 readonly 但可以填充
+    return element.disabled;
   }
   if (element instanceof HTMLSelectElement) {
     return element.disabled;
@@ -120,7 +124,8 @@ export function isElementDisabled(element: HTMLElement): boolean {
     element.getAttribute('aria-disabled') === 'true' ||
     element.classList.contains('is-disabled') ||
     element.classList.contains('ant-select-disabled') ||
-    element.classList.contains('ant-picker-disabled')
+    element.classList.contains('ant-picker-disabled') ||
+    element.classList.contains('ivu-select-disabled')
   );
 }
 

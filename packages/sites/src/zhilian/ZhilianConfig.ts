@@ -2,14 +2,14 @@
 /**
  * 智联招聘 站点配置
  *
- * 技术栈: Vue + Element UI
+ * 技术栈: Vue + iView UI（ivu- 前缀）+ 智联自研组件（zp- 前缀）
  * 简历页面: https://i.zhaopin.com/resume
  *
  * 智联简历页特点：
- * 1. SPA 应用，路由切换后表单动态加载
- * 2. 表单可能在 iframe 中（部分版本）
- * 3. 使用 Element UI 组件库
- * 4. class 名经常带 hash 后缀，需要用属性选择器
+ * 1. SPA 应用，表单在"编辑"按钮点击后才出现
+ * 2. 使用 iView UI（不是 Element UI），class 前缀 ivu-
+ * 3. 部分组件自研：zp-radio, select-input
+ * 4. 表单项结构：.profileLib__item > .profileLib__item-label + .profileLib__item__panel
  */
 
 import { BaseSiteConfig } from '../base/BaseSiteConfig.js';
@@ -18,7 +18,7 @@ export class ZhilianConfig extends BaseSiteConfig {
   readonly name = '智联招聘';
   readonly domain = 'zhaopin.com';
   readonly framework = 'vue' as const;
-  readonly uiLibrary = 'element-ui';
+  readonly uiLibrary = 'iview';
 
   readonly urlPatterns = [
     /^https:\/\/i\.zhaopin\.com\/resume/,
