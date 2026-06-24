@@ -1,0 +1,28 @@
+{
+  "name": "@auto-form-filler/extension",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && node copy-assets.mjs",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@auto-form-filler/core": "workspace:*",
+    "@auto-form-filler/adapters": "workspace:*",
+    "@auto-form-filler/sites": "workspace:*",
+    "@auto-form-filler/shared": "workspace:*",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.5"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.270",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.5.0",
+    "vite": "^5.4.0"
+  }
+}

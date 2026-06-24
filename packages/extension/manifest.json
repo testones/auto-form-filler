@@ -1,0 +1,57 @@
+{
+  "manifest_version": 3,
+  "name": "简历自动填充助手",
+  "version": "1.0.0",
+  "description": "招聘网站在线简历表单自动填充工具 — 支持 BOSS直聘、智联招聘、猎聘、前程无忧、拉勾网",
+  "permissions": ["storage", "activeTab", "scripting", "tabs"],
+  "host_permissions": [
+    "https://*.zhipin.com/*",
+    "https://*.zhaopin.com/*",
+    "https://*.liepin.com/*",
+    "https://*.51job.com/*",
+    "https://*.lagou.com/*"
+  ],
+  "action": {
+    "default_popup": "src/popup/index.html",
+    "default_title": "简历自动填充助手",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "src/options/index.html",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.zhipin.com/*",
+        "https://*.zhaopin.com/*",
+        "https://*.liepin.com/*",
+        "https://*.51job.com/*",
+        "https://*.lagou.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": [
+        "https://*.zhipin.com/*",
+        "https://*.zhaopin.com/*",
+        "https://*.liepin.com/*",
+        "https://*.51job.com/*",
+        "https://*.lagou.com/*"
+      ]
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
