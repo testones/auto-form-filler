@@ -14,10 +14,11 @@ const DEFAULT_RESUME = {
   basicInfo: {
     name: '张三',
     gender: 'male',
-    birthDate: '1995-06-15',
+    birthDate: '1995-06',
     phone: '13800138000',
     email: 'zhangsan@example.com',
-    currentCity: '北京',
+    currentCity: '成都',
+    politicalStatus: '群众',
   },
   jobPreference: {
     jobTitle: '前端开发工程师',

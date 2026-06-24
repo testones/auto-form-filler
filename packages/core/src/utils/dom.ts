@@ -77,15 +77,25 @@ export function getLabelForElement(element: HTMLElement): string | null {
 
   // 方式4: 父级 form-item 中的 label
   const formItem = element.closest(
-    '.ant-form-item, .el-form-item, .arco-form-item, .form-item, .form-group, .profileLib__item, .profile-edit-item, .ivu-form-item'
+    '.ant-form-item, .el-form-item, .arco-form-item, .form-item, .form-group, .profileLib__item, .profile-edit-item, .ivu-form-item, .job-target-edit__item'
   );
   if (formItem) {
     const label = formItem.querySelector(
-      '.ant-form-item-label label, .el-form-item__label, .arco-form-item-label, .profileLib__item-label, .profile-edit-item-label, .ivu-form-item-label, label, .label, .job-target-edit__lab'
+      '.ant-form-item-label label, .el-form-item__label, .arco-form-item-label, .profileLib__item-label, .profile-edit-item-label, .ivu-form-item-label, .job-target-edit__lab, label, .label'
     );
     if (label?.textContent) {
       return label.textContent.trim();
     }
+  }
+
+  // 方式5: 向上查找最近的包含 label 文本的父级容器
+  let parent = element.parentElement;
+  for (let i = 0; i < 5 && parent; i++) {
+    const labelEl = parent.querySelector('.profileLib__item-label, .profile-edit-item-label, .job-target-edit__lab, label, .label, [class*="label"]');
+    if (labelEl?.textContent) {
+      return labelEl.textContent.trim();
+    }
+    parent = parent.parentElement;
   }
 
   return null;

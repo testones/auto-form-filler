@@ -148,33 +148,58 @@ export class VueAdapter extends BaseAdapter {
     const selectEl = field.element.closest('.ivu-select') || field.element;
     const trigger = selectEl.querySelector('.ivu-select-selection') || selectEl;
 
-    // Step 1: 点击打开下拉
+    console.log(`[AutoFormFiller] fillIvuSelect: 查找 "${targetValue}"`);
+
+    // Step 1: 点击打开下拉（完整事件链）
     this.scrollIntoView(selectEl as HTMLElement);
-    trigger.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const triggerEl = trigger as HTMLElement;
+    triggerEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await this.sleep(50);
+    triggerEl.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    await this.sleep(50);
+    triggerEl.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     await this.sleep(config.actionDelay * 3);
 
     // Step 2: 查找选项
-    const options = document.querySelectorAll('.ivu-select-dropdown-list .ivu-select-item, .ivu-select-item');
+    const options = document.querySelectorAll('.ivu-select-dropdown-list .ivu-select-item, .ivu-select-item:not(.ivu-select-item-selected)');
     let found = false;
     for (const opt of options) {
       const text = opt.textContent?.trim() || '';
-      // 匹配值或文本
-      if (text === targetValue || text.includes(targetValue) ||
-          this.matchGenderValue(text, targetValue) || this.matchDegreeValue(text, targetValue)) {
-        (opt as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      const matched = text === targetValue || text.includes(targetValue) ||
+          this.matchGenderValue(text, targetValue) || this.matchDegreeValue(text, targetValue) ||
+          this.matchPoliticalValue(text, targetValue);
+
+      if (matched) {
+        const optEl = opt as HTMLElement;
+        optEl.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, cancelable: true }));
+        await this.sleep(30);
+        optEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        await this.sleep(30);
+        optEl.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+        await this.sleep(30);
+        optEl.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         found = true;
+        console.log(`[AutoFormFiller]   ivu-select 选择: "${text}"`);
         await this.sleep(config.actionDelay);
         break;
       }
     }
 
     if (!found) {
-      // 关闭下拉
       document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     }
 
     if (config.highlightFilled) this.highlight(selectEl as HTMLElement, config.highlightColor);
     return this.successResult(field.label, Date.now() - startTime, FillStrategy.CLICK_SELECT);
+  }
+
+  /** 政治面貌值匹配 */
+  private matchPoliticalValue(text: string, value: string): boolean {
+    const map: Record<string, string[]> = {
+      '群众': ['群众'], '团员': ['团员'], '党员': ['中共党员', '党员'],
+    };
+    const targets = map[value];
+    return !!targets?.some(t => text.includes(t));
   }
 
   /** 智联 select-input 填充 */
@@ -185,42 +210,51 @@ export class VueAdapter extends BaseAdapter {
 
     const selectEl = field.element.closest('.select-input') || field.element;
     this.scrollIntoView(selectEl as HTMLElement);
+    console.log(`[AutoFormFiller] fillSelectInput: 查找 "${targetValue}"`);
 
-    // Step 1: 点击打开
-    selectEl.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    // Step 1: 点击打开（完整事件链）
+    const el = selectEl as HTMLElement;
+    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    await this.sleep(50);
+    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    await this.sleep(50);
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
     await this.sleep(config.actionDelay * 3);
 
-    // Step 2: 查找下拉选项（智联的城市选择器通常在 .s-region 中）
-    const regionEl = selectEl.parentElement?.querySelector('.s-region');
+    // Step 2: 查找下拉选项
+    // 智联的城市选择器通常在 .s-region 中，也可能是其他下拉容器
+    const dropdownContainers = [
+      selectEl.parentElement?.querySelector('.s-region'),
+      selectEl.closest('.job-target-edit__item')?.querySelector('.s-region'),
+      document.querySelector('.s-region:not([style*="display: none"])'),
+    ].filter(Boolean);
+
     let found = false;
 
-    if (regionEl) {
-      // 城市选择器：逐级选择
-      const items = regionEl.querySelectorAll('li, .city-item, [class*="region"] li, a');
+    for (const container of dropdownContainers) {
+      if (!container) continue;
+      const items = container.querySelectorAll('li, .city-item, [class*="region"] li, a, span');
       for (const item of items) {
-        if (item.textContent?.trim() === targetValue || item.textContent?.includes(targetValue)) {
-          (item as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        const text = item.textContent?.trim() || '';
+        if (text === targetValue || text.includes(targetValue) ||
+            targetValue.includes(text)) {
+          const itemEl = item as HTMLElement;
+          itemEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+          await this.sleep(30);
+          itemEl.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+          await this.sleep(30);
+          itemEl.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
           found = true;
+          console.log(`[AutoFormFiller]   城市选择: "${text}"`);
           await this.sleep(config.actionDelay);
           break;
         }
       }
+      if (found) break;
     }
 
     if (!found) {
-      // 通用查找
-      const allItems = document.querySelectorAll('li, [role="option"], [class*="dropdown"] li');
-      for (const item of allItems) {
-        if (item.textContent?.trim() === targetValue) {
-          (item as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
-          found = true;
-          await this.sleep(config.actionDelay);
-          break;
-        }
-      }
-    }
-
-    if (!found) {
+      // 关闭下拉
       document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     }
 
@@ -320,12 +354,29 @@ export class VueAdapter extends BaseAdapter {
 
     // zp-radio 的选项是 li.zp-radio__item
     const items = field.element.querySelectorAll('.zp-radio__item, .zp-radio__list li');
+    console.log(`[AutoFormFiller] fillZpRadio: 查找 "${targetValue}", 共 ${items.length} 个选项`);
+
     for (const item of items) {
       const text = item.textContent?.trim() || '';
-      if (text.includes(targetValue) || this.matchGenderValue(text, targetValue)) {
-        this.scrollIntoView(item as HTMLElement);
-        (item as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      const matched = text.includes(targetValue) || this.matchGenderValue(text, targetValue);
+      console.log(`[AutoFormFiller]   选项: "${text}" matched=${matched}`);
+
+      if (matched) {
+        const el = item as HTMLElement;
+        this.scrollIntoView(el);
+
+        // 完整事件链：mouseenter → mousedown → mouseup → click
+        // Vue 的 @click 绑定在 li 上，需要完整的鼠标事件链
+        el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, cancelable: true }));
+        await this.sleep(30);
+        el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+        await this.sleep(30);
+        el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+        await this.sleep(30);
+        el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
         await this.sleep(config.actionDelay);
+
+        console.log(`[AutoFormFiller]   已点击: "${text}"`);
         if (config.highlightFilled) this.highlight(field.element, config.highlightColor);
         return this.successResult(field.label, Date.now() - startTime, FillStrategy.DOM_EVENT);
       }
