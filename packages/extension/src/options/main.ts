@@ -7,33 +7,39 @@ const status = document.getElementById('status') as HTMLSpanElement;
 
 const DEFAULT_RESUME = {
   basicInfo: {
-    name: '张三', gender: 'male', birthDate: '1995-06-15',
-    phone: '13800138000', email: 'zhangsan@example.com', currentCity: '北京',
+    name: '张三', gender: 'female', birthDate: '1995-05',
+    phone: '13800138000', email: 'zhangsan@example.com', currentCity: '大同',
+    politicalStatus: '中共党员', hometown: '山西',
+    wechat: 'zhangsan123', qq: '123456789',
+    ethnicity: '汉族', maritalStatus: '未婚',
+    height: 175, weight: 65, address: '北京市',
   },
   jobPreference: {
-    jobTitle: '前端开发工程师', expectedCities: ['北京'],
-    expectedSalary: '20k-30k', jobType: 'fulltime',
+    jobTitle: 'Node.js工程师', expectedCities: ['包头'],
+    expectedSalary: '10000-20000', jobType: 'fulltime',
+    jobStatus: '离职找工作', industry: '旅游', availableDate: '一周内',
   },
-  education: [{
-    school: '北京理工大学', degree: 'bachelor', major: '计算机科学与技术',
-    startDate: '2013-09', endDate: '2017-06',
-  }],
+  education: [
+    { school: '清华大学', degree: 'bachelor', major: '计算机科学与技术', startDate: '2013-09', endDate: '2017-07' },
+    { school: '北京大学', degree: 'doctor', major: '经济学', startDate: '2022-02', endDate: '2026-05' },
+  ],
   workExperience: [{
-    company: '字节跳动', title: '高级前端工程师',
-    startDate: '2020-07', endDate: 'present',
-    description: '负责抖音 Web 端核心功能开发', department: '前端架构组',
+    company: '阿里巴巴', title: '软件工程师',
+    startDate: '2017-07', endDate: '2022-08',
+    description: '系统开发与维护', department: '技术部',
   }],
   projectExperience: [{
-    name: '抖音 Web 端重构', role: '前端负责人',
-    description: '主导抖音 Web 端从 Vue2 迁移到 React18',
+    name: '智能客服系统', role: '项目经理',
+    description: '开发智能客服系统',
   }],
   skills: [
     { name: 'JavaScript', level: 'expert' },
-    { name: 'TypeScript', level: 'advanced' },
-    { name: 'React', level: 'advanced' },
+    { name: 'Node.js', level: 'advanced' },
+    { name: '项目管理', level: 'intermediate' },
   ],
   additionalInfo: {
-    selfIntro: '5年前端开发经验，精通 React/Vue 生态。',
+    selfIntro: '工作认真负责，学习能力强，具备良好的团队合作精神。',
+    hobbies: '阅读、运动',
   },
 };
 
