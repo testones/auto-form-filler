@@ -120,13 +120,28 @@ export class FormFiller {
       // Step 3: 检测表单字段
       Logger.info('Step 3: Detecting form fields...');
       const formContainer = siteConfig.getFormContainer?.() ?? document.body;
+      Logger.info(`Form container:`, formContainer.tagName, formContainer.className);
       const detectedFields = this.fieldDetector.detectInContainer(formContainer);
       Logger.info(`Detected ${detectedFields.length} fields`);
+
+      // 调试：打印所有检测到的字段
+      detectedFields.forEach((f, i) => {
+        Logger.info(
+          `  [${i}] type=${f.fieldType} label="${f.label}" placeholder="${f.placeholder}" name="${f.name}" component=${f.componentType} tag=${f.element.tagName}`
+        );
+      });
 
       // Step 4: 匹配字段到简历数据
       Logger.info('Step 4: Matching fields...');
       const matchedFields = this.fieldMatcher.match(detectedFields);
       Logger.info(`Matched ${matchedFields.length} fields to resume data`);
+
+      // 调试：打印所有匹配结果
+      matchedFields.forEach((m, i) => {
+        Logger.info(
+          `  [${i}] field="${m.detectedField.label}" → resume="${m.resumeFieldKey}" confidence=${m.confidence.toFixed(2)} strategy=${m.fillStrategy}`
+        );
+      });
 
       // Step 5: 应用站点自定义映射
       const finalMappings = siteConfig.applyFieldMappings?.(matchedFields) ?? matchedFields;

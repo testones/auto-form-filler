@@ -3,18 +3,10 @@
  * DOM 树扫描器
  *
  * 负责扫描 DOM 树，发现所有表单控件元素。
- * 分为两类扫描：
- * 1. 原生表单元素：input, textarea, select
- * 2. 框架组件：通过 CSS 选择器识别 Ant Design / Element UI 等封装的组件
  */
 
 import type { DetectedField } from '@auto-form-filler/shared/types';
 import { FieldType } from '@auto-form-filler/shared/types';
-import {
-  ANT_DESIGN_SELECTORS,
-  ELEMENT_UI_SELECTORS,
-  NATIVE_SELECTORS,
-} from '@auto-form-filler/shared/constants';
 import { getLabelForElement, isElementVisible, isElementDisabled } from '../utils/dom.js';
 import { FieldClassifier } from './FieldClassifier.js';
 
@@ -34,7 +26,8 @@ export class DOMScanner {
       'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"]):not([type="image"])'
     );
     for (const input of inputs) {
-      if (!isElementVisible(input) || isElementDisabled(input)) continue;
+      // 放宽可见性检查 — SPA 可能还在动画中
+      if (isElementDisabled(input)) continue;
       const field = this.createDetectedField(input);
       if (field) fields.push(field);
     }
@@ -42,7 +35,7 @@ export class DOMScanner {
     // 扫描 textarea
     const textareas = this.root.querySelectorAll<HTMLTextAreaElement>('textarea');
     for (const ta of textareas) {
-      if (!isElementVisible(ta) || isElementDisabled(ta)) continue;
+      if (isElementDisabled(ta)) continue;
       const field = this.createDetectedField(ta);
       if (field) fields.push(field);
     }
@@ -50,7 +43,7 @@ export class DOMScanner {
     // 扫描 select
     const selects = this.root.querySelectorAll<HTMLSelectElement>('select');
     for (const sel of selects) {
-      if (!isElementVisible(sel) || isElementDisabled(sel)) continue;
+      if (isElementDisabled(sel)) continue;
       const field = this.createDetectedField(sel);
       if (field) fields.push(field);
     }
@@ -61,39 +54,20 @@ export class DOMScanner {
   /** 扫描框架组件 */
   scanFrameworkComponents(): DetectedField[] {
     const fields: DetectedField[] = [];
-
-    // Ant Design 组件
     fields.push(...this.scanAntDesignComponents());
-
-    // Element UI 组件
     fields.push(...this.scanElementUIComponents());
-
-    // 其他通用组件检测
     fields.push(...this.scanGenericComponents());
-
     return fields;
   }
 
   /** 扫描 Ant Design 组件 */
   private scanAntDesignComponents(): DetectedField[] {
     const fields: DetectedField[] = [];
-
-    // Form Item 容器
     const formItems = this.root.querySelectorAll('.ant-form-item');
     for (const item of formItems) {
-      if (!isElementVisible(item as HTMLElement)) continue;
       const field = this.processFormItemContainer(item as HTMLElement);
       if (field) fields.push(field);
     }
-
-    // 独立的 Select（不在 form-item 中）
-    const standaloneSelects = this.root.querySelectorAll('.ant-select:not(.ant-form-item .ant-select)');
-    for (const sel of standaloneSelects) {
-      if (!isElementVisible(sel as HTMLElement) || isElementDisabled(sel as HTMLElement)) continue;
-      const field = this.createDetectedField(sel as HTMLElement);
-      if (field) fields.push(field);
-    }
-
     return fields;
   }
 
@@ -101,17 +75,38 @@ export class DOMScanner {
   private scanElementUIComponents(): DetectedField[] {
     const fields: DetectedField[] = [];
 
+    // 1. 通过 el-form-item 扫描
     const formItems = this.root.querySelectorAll('.el-form-item');
     for (const item of formItems) {
-      if (!isElementVisible(item as HTMLElement)) continue;
       const field = this.processFormItemContainer(item as HTMLElement);
       if (field) fields.push(field);
     }
 
-    const standaloneSelects = this.root.querySelectorAll('.el-select:not(.el-form-item .el-select)');
-    for (const sel of standaloneSelects) {
-      if (!isElementVisible(sel as HTMLElement) || isElementDisabled(sel as HTMLElement)) continue;
-      const field = this.createDetectedField(sel as HTMLElement);
+    // 2. 扫描独立的 el-input（不在 el-form-item 中的）
+    const standaloneInputs = this.root.querySelectorAll('.el-input');
+    for (const el of standaloneInputs) {
+      // 如果已经在 el-form-item 中处理过就跳过
+      if (el.closest('.el-form-item')) continue;
+      const input = el.querySelector('input');
+      if (input && !isElementDisabled(input)) {
+        const field = this.createDetectedField(el as HTMLElement);
+        if (field) fields.push(field);
+      }
+    }
+
+    // 3. 扫描独立的 el-select
+    const standaloneSelects = this.root.querySelectorAll('.el-select');
+    for (const el of standaloneSelects) {
+      if (el.closest('.el-form-item')) continue;
+      const field = this.createDetectedField(el as HTMLElement);
+      if (field) fields.push(field);
+    }
+
+    // 4. 扫描 el-date-editor
+    const datePickers = this.root.querySelectorAll('.el-date-editor');
+    for (const el of datePickers) {
+      if (el.closest('.el-form-item')) continue;
+      const field = this.createDetectedField(el as HTMLElement);
       if (field) fields.push(field);
     }
 
@@ -121,23 +116,19 @@ export class DOMScanner {
   /** 扫描通用组件（role 属性等） */
   private scanGenericComponents(): DetectedField[] {
     const fields: DetectedField[] = [];
-
-    // 带 role 属性的组合框
     const comboboxes = this.root.querySelectorAll('[role="combobox"], [role="listbox"]');
     for (const cb of comboboxes) {
-      if (!isElementVisible(cb as HTMLElement) || isElementDisabled(cb as HTMLElement)) continue;
+      if (isElementDisabled(cb as HTMLElement)) continue;
       const field = this.createDetectedField(cb as HTMLElement);
       if (field) fields.push(field);
     }
-
     return fields;
   }
 
-  /** 处理表单项容器（.ant-form-item / .el-form-item） */
+  /** 处理表单项容器 */
   private processFormItemContainer(container: HTMLElement): DetectedField | null {
-    // 在容器内找到实际的表单控件
     const controlSelectors = [
-      'input:not([type="hidden"])',
+      'input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="reset"])',
       'textarea',
       'select',
       '.ant-select',
@@ -156,13 +147,14 @@ export class DOMScanner {
       '.el-input-number',
       '.el-switch',
       '.el-upload',
+      '.el-input',
       '[role="combobox"]',
       '[role="radiogroup"]',
     ];
 
     for (const sel of controlSelectors) {
       const control = container.querySelector(sel);
-      if (control && isElementVisible(control as HTMLElement) && !isElementDisabled(control as HTMLElement)) {
+      if (control && !isElementDisabled(control as HTMLElement)) {
         const field = this.createDetectedField(control as HTMLElement, container);
         if (field) return field;
       }
@@ -179,12 +171,14 @@ export class DOMScanner {
       element.querySelector('input')?.getAttribute('placeholder') ||
       '';
 
-    // 如果没有 label 且没有 placeholder，跳过（可能是装饰性控件）
-    if (!label && !placeholder) {
-      // 但仍然检查 name 属性
-      const name = element.getAttribute('name') || element.querySelector('input')?.getAttribute('name');
-      if (!name) return null;
-    }
+    // 获取 name 属性
+    const name =
+      element.getAttribute('name') ||
+      element.querySelector('input')?.getAttribute('name') ||
+      '';
+
+    // 不再跳过没有 label/placeholder/name 的元素
+    // 智联等网站的 label 可能在远处的容器中，后续 FieldMatcher 会通过语义匹配
 
     const fieldType = FieldClassifier.classify(element);
 
@@ -208,7 +202,7 @@ export class DOMScanner {
       fieldType,
       label,
       placeholder,
-      name: attributes['name'] || '',
+      name,
       required:
         element.hasAttribute('required') ||
         element.getAttribute('aria-required') === 'true' ||
