@@ -1,12 +1,7 @@
 // build.mjs — 分步构建 Chrome Extension
-// 1. 构建 HTML 页面 (popup + options)
-// 2. 构建 content.js (IIFE, inlineDynamicImports)
-// 3. 构建 background.js (IIFE, inlineDynamicImports)
-// 4. 构建 injected.js (IIFE, inlineDynamicImports)
-// 5. 复制 manifest.json 和 icons
-
+// 核心策略：HTML 页面和 JS 脚本分开构建，每个 JS 用 lib mode 单文件输出
 import { build } from 'vite';
-import { copyFileSync, mkdirSync, existsSync, rmSync } from 'fs';
+import { copyFileSync, mkdirSync, existsSync, rmSync, readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
@@ -17,9 +12,14 @@ const distDir = join(__dirname, 'dist');
 if (existsSync(distDir)) rmSync(distDir, { recursive: true, force: true });
 mkdirSync(distDir, { recursive: true });
 
+const sharedAlias = { '@shared': join(__dirname, '../../shared') };
+const define = { 'process.env.NODE_ENV': JSON.stringify('production') };
+
 console.log('🔨 [1/5] 构建 HTML 页面 (popup + options)...');
 await build({
+  configFile: false,
   logLevel: 'warn',
+  plugins: [(await import('@vitejs/plugin-react')).default()],
   build: {
     outDir: distDir,
     emptyOutDir: false,
@@ -37,89 +37,58 @@ await build({
     target: 'es2022',
     minify: false,
   },
-  resolve: {
-    alias: { '@shared': join(__dirname, '../../shared') },
-  },
-  define: { 'process.env.NODE_ENV': JSON.stringify('production') },
-  plugins: [(await import('@vitejs/plugin-react')).default()],
+  resolve: { alias: sharedAlias },
+  define,
 });
+
+// 构建 JS 脚本的通用函数
+async function buildScript(name, entryPath) {
+  console.log(`🔨 构建 ${name}.js...`);
+  await build({
+    configFile: false,
+    logLevel: 'warn',
+    build: {
+      outDir: distDir,
+      emptyOutDir: false,
+      lib: {
+        entry: join(__dirname, entryPath),
+        name,
+        fileName: () => `${name}.js`,
+        formats: ['iife'],
+      },
+      // 不设置 inlineDynamicImports，lib mode + iife 默认就是单文件
+      rollupOptions: {
+        output: {
+          // 确保不生成额外的 chunk 文件
+          assetFileNames: `${name}-[hash].[ext]`,
+        },
+      },
+      target: 'es2022',
+      minify: false,
+    },
+    resolve: { alias: sharedAlias },
+    define,
+  });
+  console.log(`  ✅ ${name}.js`);
+}
 
 console.log('🔨 [2/5] 构建 content.js...');
-await build({
-  logLevel: 'warn',
-  build: {
-    outDir: distDir,
-    emptyOutDir: false,
-    lib: {
-      entry: join(__dirname, 'src/content/index.ts'),
-      name: 'content',
-      fileName: () => 'content.js',
-      formats: ['iife'],
-    },
-    rollupOptions: { output: { inlineDynamicImports: true } },
-    target: 'es2022',
-    minify: false,
-  },
-  resolve: {
-    alias: { '@shared': join(__dirname, '../../shared') },
-  },
-  define: { 'process.env.NODE_ENV': JSON.stringify('production') },
-});
+await buildScript('content', 'src/content/index.ts');
 
 console.log('🔨 [3/5] 构建 background.js...');
-await build({
-  logLevel: 'warn',
-  build: {
-    outDir: distDir,
-    emptyOutDir: false,
-    lib: {
-      entry: join(__dirname, 'src/background/index.ts'),
-      name: 'background',
-      fileName: () => 'background.js',
-      formats: ['iife'],
-    },
-    rollupOptions: { output: { inlineDynamicImports: true } },
-    target: 'es2022',
-    minify: false,
-  },
-  resolve: {
-    alias: { '@shared': join(__dirname, '../../shared') },
-  },
-  define: { 'process.env.NODE_ENV': JSON.stringify('production') },
-});
+await buildScript('background', 'src/background/index.ts');
 
 console.log('🔨 [4/5] 构建 injected.js...');
-await build({
-  logLevel: 'warn',
-  build: {
-    outDir: distDir,
-    emptyOutDir: false,
-    lib: {
-      entry: join(__dirname, 'src/content/injected.ts'),
-      name: 'injected',
-      fileName: () => 'injected.js',
-      formats: ['iife'],
-    },
-    rollupOptions: { output: { inlineDynamicImports: true } },
-    target: 'es2022',
-    minify: false,
-  },
-  resolve: {
-    alias: { '@shared': join(__dirname, '../../shared') },
-  },
-  define: { 'process.env.NODE_ENV': JSON.stringify('production') },
-});
+await buildScript('injected', 'src/content/injected.ts');
 
 console.log('🔨 [5/5] 复制静态资源...');
-// 复制 manifest.json — 去掉 background 的 type:module（因为现在是 IIFE）
-let manifest = await import('fs').then(m => m.readFileSync(join(__dirname, 'manifest.json'), 'utf-8'));
-manifest = manifest.replace('"service_worker": "background.js",\n    "type": "module"', '"service_worker": "background.js"');
-import('fs').then(m => m.writeFileSync(join(distDir, 'manifest.json'), manifest));
+// 复制 manifest.json
+copyFileSync(join(__dirname, 'manifest.json'), join(distDir, 'manifest.json'));
 console.log('  ✅ manifest.json');
 
 // 复制 icons
 const iconsDir = join(distDir, 'icons');
-if (!existsSync(iconsDir)) mkdirSync(iconsDir, { recursive: true });
+mkdirSync(iconsDir, { recursive: true });
 for (const size of [16, 48, 128]) {
   copyFileSync(join(__dirname, 'icons', `icon${size}.png`), join(iconsDir, `icon${size}.png`));
 }
