@@ -221,6 +221,7 @@ export class FormFiller {
 
       // 跳过空值
       if (value === undefined || value === null || value === '') {
+        Logger.info(`  跳过 "${mapping.resumeFieldKey}" — 简历数据为空`);
         report.skippedCount++;
         options.onProgress?.({
           current: i + 1,
@@ -233,6 +234,7 @@ export class FormFiller {
 
       // 跳过已有值的字段
       if (this.config.skipFilled && adapter.hasValue(mapping.detectedField.element)) {
+        Logger.info(`  跳过 "${mapping.resumeFieldKey}" — 字段已有值`);
         report.skippedCount++;
         options.onProgress?.({
           current: i + 1,
@@ -300,12 +302,19 @@ export class FormFiller {
     return report;
   }
 
-  /** 从简历数据中按路径获取值 */
+  /** 从简历数据中按路径获取值
+   * 支持数组自动索引：workExperience.company 会取 workExperience[0].company
+   */
   private getResumeValue(data: ResumeData, path: string): unknown {
     const parts = path.split('.');
     let current: unknown = data;
     for (const part of parts) {
       if (current === undefined || current === null) return undefined;
+      // 如果当前是数组，自动取第一个元素
+      if (Array.isArray(current)) {
+        current = current[0];
+        if (current === undefined || current === null) return undefined;
+      }
       current = (current as Record<string, unknown>)[part];
     }
     return current;

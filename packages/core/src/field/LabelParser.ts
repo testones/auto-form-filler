@@ -38,6 +38,8 @@ export class LabelParser {
 
     // 策略3: Placeholder 匹配（label 为空时这是主要匹配途径）
     if (placeholder) {
+      // 排除搜索框 — 搜索框的 placeholder 通常以"搜索"开头
+      if (this.isSearchField(placeholder)) return null;
       const placeholderMatch = this.tryPlaceholderMatch(placeholder);
       if (placeholderMatch) return placeholderMatch;
     }
@@ -156,5 +158,12 @@ export class LabelParser {
       .toLowerCase()
       .replace(/\s+/g, '')
       .replace(/[：:：*·•\-/｜|（）()【】\[\]「」『』""'']/g, '');
+  }
+
+  /** 判断是否是搜索框 — 搜索框不应该被匹配为简历字段 */
+  static isSearchField(placeholder: string): boolean {
+    const normalized = this.normalize(placeholder);
+    const searchKeywords = ['搜索', 'search', '查找', '输入关键字', '请输入关键词'];
+    return searchKeywords.some(kw => normalized.startsWith(this.normalize(kw)));
   }
 }
