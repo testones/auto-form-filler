@@ -202,7 +202,10 @@ export class VueAdapter extends BaseAdapter {
     return !!targets?.some(t => text.includes(t));
   }
 
-  /** 智联 select-input 填充 */
+  /** 智联 select-input 填充
+   * 智联的城市选择器会弹出 s-dialog + s-cascader 级联对话框
+   * 结构：省份(s-cascader__first-level) → 城市(s-cascader__second-level) → 区县(s-cascader__third-level)
+   */
   private async fillSelectInput(context: FillContext): Promise<FillResult> {
     const { field, value, config } = context;
     const startTime = Date.now();
@@ -212,17 +215,24 @@ export class VueAdapter extends BaseAdapter {
     this.scrollIntoView(selectEl as HTMLElement);
     console.log(`[AutoFormFiller] fillSelectInput: 查找 "${targetValue}"`);
 
-    // Step 1: 点击打开（完整事件链）
+    // Step 1: 点击打开
     const el = selectEl as HTMLElement;
     el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
     await this.sleep(50);
     el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
     await this.sleep(50);
     el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-    await this.sleep(config.actionDelay * 3);
+    await this.sleep(config.actionDelay * 4);
 
-    // Step 2: 查找下拉选项
-    // 智联的城市选择器通常在 .s-region 中，也可能是其他下拉容器
+    // Step 2: 检查是否弹出了 s-dialog 级联选择器
+    const dialog = document.querySelector('.s-dialog:not([style*="display: none"])');
+
+    if (dialog) {
+      console.log('[AutoFormFiller] 检测到级联选择对话框');
+      return await this.fillCascaderDialog(dialog as HTMLElement, targetValue, field, config, startTime);
+    }
+
+    // Step 3: 没有对话框，尝试普通下拉
     const dropdownContainers = [
       selectEl.parentElement?.querySelector('.s-region'),
       selectEl.closest('.job-target-edit__item')?.querySelector('.s-region'),
@@ -236,16 +246,10 @@ export class VueAdapter extends BaseAdapter {
       const items = container.querySelectorAll('li, .city-item, [class*="region"] li, a, span');
       for (const item of items) {
         const text = item.textContent?.trim() || '';
-        if (text === targetValue || text.includes(targetValue) ||
-            targetValue.includes(text)) {
-          const itemEl = item as HTMLElement;
-          itemEl.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-          await this.sleep(30);
-          itemEl.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-          await this.sleep(30);
-          itemEl.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+        if (text === targetValue || text.includes(targetValue)) {
+          this.clickElement(item as HTMLElement);
           found = true;
-          console.log(`[AutoFormFiller]   城市选择: "${text}"`);
+          console.log(`[AutoFormFiller]   选择: "${text}"`);
           await this.sleep(config.actionDelay);
           break;
         }
@@ -254,12 +258,115 @@ export class VueAdapter extends BaseAdapter {
     }
 
     if (!found) {
-      // 关闭下拉
       document.body.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     }
 
     if (config.highlightFilled) this.highlight(selectEl as HTMLElement, config.highlightColor);
     return this.successResult(field.label, Date.now() - startTime, FillStrategy.CLICK_SELECT);
+  }
+
+  /** 填充级联选择对话框（s-cascader） */
+  private async fillCascaderDialog(
+    dialog: HTMLElement,
+    targetValue: string,
+    field: FillContext['field'],
+    config: FillContext['config'],
+    startTime: number
+  ): Promise<FillResult> {
+    const cascader = dialog.querySelector('.s-cascader');
+
+    if (cascader) {
+      // 级联选择：省份 → 城市 → 区县
+      // 先在第二级（城市列表）中查找目标城市
+      const secondLevel = cascader.querySelector('.s-cascader__second-level');
+      if (secondLevel) {
+        const cityOptions = secondLevel.querySelectorAll('.s-cascader__option');
+        let cityFound = false;
+
+        for (const opt of cityOptions) {
+          const text = opt.querySelector('p')?.textContent?.trim() || opt.textContent?.trim() || '';
+          if (text === targetValue || text.includes(targetValue)) {
+            console.log(`[AutoFormFiller]   城市级联: 点击 "${text}"`);
+            this.clickElement(opt as HTMLElement);
+            cityFound = true;
+            await this.sleep(config.actionDelay * 2);
+            break;
+          }
+        }
+
+        // 如果第二级没找到，在第一级（省份）中查找
+        if (!cityFound) {
+          const firstLevel = cascader.querySelector('.s-cascader__first-level');
+          if (firstLevel) {
+            const provinceOptions = firstLevel.querySelectorAll('.s-cascader__option');
+            for (const opt of provinceOptions) {
+              const text = opt.querySelector('p')?.textContent?.trim() || opt.textContent?.trim() || '';
+              if (text === targetValue || text.includes(targetValue)) {
+                console.log(`[AutoFormFiller]   省份级联: 点击 "${text}"`);
+                this.clickElement(opt as HTMLElement);
+                await this.sleep(config.actionDelay * 2);
+
+                // 点击省份后，第三级会显示该省的城市
+                const thirdLevel = cascader.querySelector('.s-cascader__third-level, .s-cascader-horizontal-list');
+                if (thirdLevel) {
+                  // 点击 "全XX" 按钮（选择整个城市）
+                  const allButton = thirdLevel.querySelector('.s-checkbutton__item');
+                  if (allButton) {
+                    console.log(`[AutoFormFiller]   选择全区: "${allButton.textContent?.trim()}"`);
+                    this.clickElement(allButton as HTMLElement);
+                    await this.sleep(config.actionDelay);
+                  }
+                }
+                cityFound = true;
+                break;
+              }
+            }
+          }
+        }
+
+        if (cityFound) {
+          // 在第三级选择 "全XX" （如果有）
+          const thirdLevel = cascader.querySelector('.s-cascader__third-level, .s-cascader-horizontal-list');
+          if (thirdLevel) {
+            const allButton = thirdLevel.querySelector('.s-checkbutton__item');
+            if (allButton) {
+              const allText = allButton.textContent?.trim() || '';
+              if (allText.startsWith('全')) {
+                console.log(`[AutoFormFiller]   选择全区: "${allText}"`);
+                this.clickElement(allButton as HTMLElement);
+                await this.sleep(config.actionDelay);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // 关闭对话框 — 点击关闭按钮
+    await this.sleep(config.actionDelay);
+    const closeBtn = dialog.querySelector('.s-dialog__icon, .s-icon-guanbi, .s-dialog__close, [class*="close"]');
+    if (closeBtn) {
+      console.log('[AutoFormFiller] 关闭级联对话框');
+      this.clickElement(closeBtn as HTMLElement);
+    } else {
+      // 点击遮罩关闭
+      const overlay = dialog.parentElement;
+      if (overlay) {
+        overlay.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      }
+    }
+    await this.sleep(config.actionDelay);
+
+    if (config.highlightFilled) this.highlight(field.element, config.highlightColor);
+    return this.successResult(field.label, Date.now() - startTime, FillStrategy.CLICK_SELECT);
+  }
+
+  /** 完整点击事件链 */
+  private clickElement(el: HTMLElement): void {
+    el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, cancelable: true }));
+    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
   }
 
   /** 性别值匹配 */

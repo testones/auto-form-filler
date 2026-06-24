@@ -77,12 +77,15 @@ const DEFAULT_RESUME: ResumeData = {
     email: 'zhangsan@example.com',
     currentCity: '成都',
     politicalStatus: '群众',
+    hometown: '四川',
   },
   jobPreference: {
     jobTitle: '前端开发工程师',
-    expectedCities: ['北京'],
+    expectedCities: ['成都'],
     expectedSalary: '20k-30k',
     jobType: 'fulltime',
+    jobStatus: '离职-随时到岗',
+    industry: '互联网',
   },
   education: [
     { school: '北京理工大学', degree: 'bachelor', major: '计算机科学与技术', startDate: '2013-09', endDate: '2017-06' },
