@@ -8,7 +8,7 @@ export const FIELD_LABEL_DICTIONARY: Record<string, string[]> = {
   'basicInfo.gender': ['性别', 'gender', 'sex'],
   'basicInfo.birthDate': ['出生日期', '生日', '出生年月', 'birthday', 'date of birth', '出生年月日', '出生'],
   'basicInfo.phone': ['手机号', '手机号码', '电话', '联系电话', '联系方式', 'phone', 'mobile', 'tel', '电话号码', '联系手机', '手机'],
-  'basicInfo.email': ['邮箱', '电子邮件', '电子邮箱', 'email', 'e-mail', 'mail', '联系邮箱', '邮箱地址'],
+  'basicInfo.email': ['邮箱', '电子邮件', '电子邮箱', 'email', 'e-mail', 'mail', '联系邮箱', '邮箱地址', '请输入邮箱'],
   'basicInfo.wechat': ['微信', '微信号', 'wechat', '微信账号'],
   'basicInfo.qq': ['QQ', 'QQ号', 'qq number'],
   'basicInfo.currentCity': ['所在城市', '现居城市', '城市', 'city', '所在地区', '现居住地', '工作城市', '现居', '居住地'],
@@ -22,7 +22,7 @@ export const FIELD_LABEL_DICTIONARY: Record<string, string[]> = {
   'basicInfo.weight': ['体重', 'weight'],
 
   // 求职意向
-  'jobPreference.jobTitle': ['期望职位', '求职意向', '职位名称', 'job title', 'position', '应聘职位', '意向职位', '期望岗位', '期望从事职位'],
+  'jobPreference.jobTitle': ['期望职位', '求职意向', '职��名称', 'job title', 'position', '应聘职位', '意向职位', '期望岗位', '期望从事职位'],
   'jobPreference.expectedCities': ['期望城市', '期望工作城市', '期望工作地', '工作城市', '意向城市'],
   'jobPreference.expectedSalary': ['期望薪资', '期望月薪', '薪资要求', 'expected salary', '薪资期望', '期望薪酬', '期望待遇'],
   'jobPreference.jobType': ['工作性质', 'job type', '工作类型', '求职类型'],
@@ -40,7 +40,7 @@ export const FIELD_LABEL_DICTIONARY: Record<string, string[]> = {
   // 工作经历
   'workExperience.company': ['公司名称', '公司', 'company', '企业名称', '单位名称', '工作单位'],
   'workExperience.title': ['职位', '职务', 'title', '岗位名称', '担任职位', '工作职位'],
-  'workExperience.startDate': ['入职时间', '开始时间', 'start date', '就职时间'],
+  'workExperience.startDate': ['入职时间', '开始时间', 'start date', '就职时间', '参加工作时间', '参加工作'],
   'workExperience.endDate': ['离职时间', '结束时间', 'end date', '至今'],
   'workExperience.description': ['工作内容', '工作描述', 'description', '工作职责', '主要工作', '工作业绩'],
   'workExperience.department': ['所在部门', '部门', 'department'],
