@@ -6,42 +6,17 @@
  */
 
 import { FieldType } from '@auto-form-filler/shared/types';
-import {
-  ANT_DESIGN_SELECTORS,
-  ELEMENT_UI_SELECTORS,
-} from '@auto-form-filler/shared/constants';
 
 export class FieldClassifier {
   /** 分类：根据元素特征判断字段类型 */
   static classify(element: HTMLElement): FieldType {
-    // 先检查 CSS class 特征
     const classes = element.className?.toString() || '';
     const allClasses = `${classes} ${element.querySelector('input')?.className || ''}`;
 
-    // 原生 HTML 元素
-    if (element instanceof HTMLInputElement || element.querySelector('input')) {
-      const input = element instanceof HTMLInputElement ? element : element.querySelector('input')!;
-      const type = input.type?.toLowerCase();
-
-      if (type === 'file') return FieldType.FILE_UPLOAD;
-      if (type === 'checkbox') return FieldType.CHECKBOX;
-      if (type === 'radio') return FieldType.RADIO;
-      if (type === 'email') return FieldType.EMAIL;
-      if (type === 'number') return FieldType.NUMBER;
-      if (type === 'url') return FieldType.URL;
-      if (type === 'password') return FieldType.PASSWORD;
-      if (type === 'tel') return FieldType.PHONE;
-      return FieldType.TEXT;
-    }
-
-    if (element instanceof HTMLTextAreaElement) return FieldType.TEXTAREA;
-    if (element instanceof HTMLSelectElement) {
-      return element.multiple ? FieldType.MULTI_SELECT : FieldType.SELECT;
-    }
+    // ====== 框架组件检测（优先于原生 input，因为框架 Select 内部有 hidden input）======
 
     // Ant Design 组件
     if (allClasses.includes('ant-select') || element.querySelector('.ant-select')) {
-      // 检查是否多选
       if (allClasses.includes('ant-select-multiple') || element.querySelector('.ant-select-selection-overflow')) {
         return FieldType.MULTI_SELECT;
       }
@@ -122,6 +97,34 @@ export class FieldClassifier {
       return FieldType.SELECT;
     }
 
+    // ====== 原生 HTML 元素检测 ======
+
+    if (element instanceof HTMLInputElement || element.querySelector('input')) {
+      const input = element instanceof HTMLInputElement ? element : element.querySelector('input')!;
+      const type = input.type?.toLowerCase();
+
+      // hidden input 不算表单字段
+      if (type === 'hidden') {
+        // 如果是 hidden input 但元素本身是 DIV（如 ivu-select），上面应该已匹配
+        // 走到这里说明框架检测没匹配，返回 UNKNOWN
+        return FieldType.UNKNOWN;
+      }
+      if (type === 'file') return FieldType.FILE_UPLOAD;
+      if (type === 'checkbox') return FieldType.CHECKBOX;
+      if (type === 'radio') return FieldType.RADIO;
+      if (type === 'email') return FieldType.EMAIL;
+      if (type === 'number') return FieldType.NUMBER;
+      if (type === 'url') return FieldType.URL;
+      if (type === 'password') return FieldType.PASSWORD;
+      if (type === 'tel') return FieldType.PHONE;
+      return FieldType.TEXT;
+    }
+
+    if (element instanceof HTMLTextAreaElement) return FieldType.TEXTAREA;
+    if (element instanceof HTMLSelectElement) {
+      return element.multiple ? FieldType.MULTI_SELECT : FieldType.SELECT;
+    }
+
     // 通用特征
     if (element.getAttribute('role') === 'combobox' || element.getAttribute('role') === 'listbox') {
       return FieldType.SELECT;
@@ -171,15 +174,10 @@ export class FieldClassifier {
   static getConfidence(element: HTMLElement, label: string): number {
     let confidence = 0.5;
 
-    // 有 label 文本 → 置信度提高
     if (label) confidence += 0.2;
-
-    // 有 name 属性 → 置信度提高
     if (element.getAttribute('name') || element.querySelector('input[name]')) {
       confidence += 0.1;
     }
-
-    // 是标准表单元素 → 置信度提高
     if (
       element instanceof HTMLInputElement ||
       element instanceof HTMLTextAreaElement ||
@@ -187,13 +185,9 @@ export class FieldClassifier {
     ) {
       confidence += 0.1;
     }
-
-    // 有 placeholder → 置信度提高
     if (element.getAttribute('placeholder')) {
       confidence += 0.05;
     }
-
-    // 是必填字段 → 置信度提高
     if (
       element.hasAttribute('required') ||
       element.getAttribute('aria-required') === 'true'
